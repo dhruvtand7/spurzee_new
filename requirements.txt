@@ -1,0 +1,11 @@
+Flask
+pandas
+plotly
+scikit-learn
+pandas_ta
+fyers-apiv3
+pyotp
+mysql-connector-python
+numpy
+pytz
+requests
