@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.24.0/esm/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns-tz@1.6.0/esm/index.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{{ url_for('static', filename='index.js') }}" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div id="topBar">
+        <!-- Your top bar HTML here -->
+    </div>
+
+    <div id="spinner" class="spinner">
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+    </div>
+
+    <div id="tvchart"></div>
+
+    <div id="control-panel">
+        <h3>Watch List</h3>
+        <table id="stock-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Open</th>
+                    <th>High</th>
+                    <th>Low</th>
+                    <th>Close</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Stock data will be dynamically inserted here -->
+            </tbody>
+        </table>
+    </div>
+
+    <div id="hover-info"></div>
+    <div id="search-popup" class="popup">
+        <!-- Search popup HTML -->
+    </div>
+
+    <script>
+        // Fetch data from Flask endpoint
+        $(document).ready(function() {
+            $.get('/get_stock_data', function(data) {
+                var stockData = data;
+
+                // Print received data to console for debugging
+                console.log('Received data:', stockData);
+
+                // Initialize chart using lightweight-charts
+                var chart = LightweightCharts.createChart(document.getElementById('tvchart'), {
+                    width: 1000,
+                    height: 400
+                });
+
+                var candlestickSeries = chart.addCandlestickSeries();
+
+                // Convert date strings to Date objects and prepare data for the chart
+                var chartData = stockData.map(function(item) {
+                    return {
+                        time: new Date(item.date),
+                        open: item.open,
+                        high: item.high,
+                        low: item.low,
+                        close: item.close
+                    };
+                });
+
+                // Print prepared chart data to console for debugging
+                console.log('Prepared chart data:', chartData);
+
+                // Load data into the chart
+                candlestickSeries.setData(chartData);
+
+                // Hide spinner after loading data
+                $('#spinner').hide();
+            });
+        });
+    </script>
+
+</body>
+</html>
