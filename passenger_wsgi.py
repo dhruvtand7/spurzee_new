@@ -1296,6 +1296,53 @@ def fetch_data_from_db(symbol, interval):
     return data
 
 
+def fetch_latest_data(symbol):
+    con = mysql.connector.connect(**db_config3)
+    cur = con.cursor()
+    sym = symbol.split(':')[-1].replace('-', '_').replace('&', '_').lower()
+    query = f"""
+        SELECT `date`, `close`
+        FROM {sym}
+        ORDER BY `date` DESC
+        LIMIT 2
+    """
+    cur.execute(query)
+    rows = cur.fetchall()
+    con.close()
+    return rows
+
+def fetch_currentday_data(symbol, interval):
+    dtime_datetime = dt.datetime.now()
+    dtime = dtime_datetime.strftime("%Y-%m-%d")
+    data = {
+            "symbol": symbol,
+            "resolution": interval,
+            "date_format": "1",
+            "range_from": dtime,
+            "range_to": dtime,
+            "cont_flag": "1"
+        }
+    df = fyers.history(data=data)
+    if 'candles' not in df:
+        return []
+    df = pd.DataFrame(df['candles'])
+    df.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
+    df['date'] = pd.to_datetime(df['date'], unit='s')
+    df.date = (df.date.dt.tz_localize('UTC').dt.tz_convert('Asia/Kolkata'))
+    df['date'] = df['date'].dt.tz_localize(None)
+    df_sorted = df.sort_values(by=['date'], ascending=True)
+    df = df_sorted.drop_duplicates(subset='date', keep='first')
+    df.reset_index(drop=True, inplace=True)
+    df['date'] = df['date'].dt.strftime('%Y-%m-%d %H:%M:%S')
+    data2 = df.rename(columns={
+        'date': 'Date',
+        'open': 'Open',
+        'high': 'High',
+        'low': 'Low',
+        'close': 'Close'
+    }).to_dict(orient='records')
+    return data2
+
 @app.route('/')
 def index():
     return render_template('home.html')
@@ -1444,8 +1491,8 @@ def submit_stock():
         "symbol": new_stock_input,
         "resolution": "5",
         "date_format": "1",
-        "range_from": "2024-04-01",
-        "range_to": "2024-04-01",
+        "range_from": "2024-07-03",
+        "range_to": "2024-07-03",
         "cont_flag": "1"
         }
         df = pd.DataFrame(fyers.history(data=data)['candles'])
@@ -1467,19 +1514,64 @@ def graph():
     
 @app.route('/stock-data')
 def get_data():
-    print('hi4')
     symbol = request.args.get('symbol', 'NSE:NIFTY50-INDEX')
     interval = request.args.get('interval', '5')
     # Fetch data from database
-    data = fetch_data_from_db(symbol, interval)
+    data1 = fetch_data_from_db(symbol, interval)
+    data2 = fetch_currentday_data(symbol, interval)
+    data = data1 + data2
     if data:
         return jsonify(data)
     else:
         return jsonify({'error': 'Data not found'}), 404
+    
+@app.route('/get-change', methods=['GET'])
+def get_change():
+    symbol = request.args.get('symbol', 'NSE:NIFTY50-INDEX')
+    data = fetch_latest_data(symbol)
+    
+    if len(data) >= 1:
+        last_close = data[0][1]
+        prev_close = data[1][1] if len(data) > 1 else last_close
+        change = last_close - prev_close
+        change_pct = (change / prev_close) * 100 if prev_close != 0 else 0
+        
+        result = {
+            'last': last_close,
+            'chg': change,
+            'chgPct': round(change_pct, 2)
+        }
+        return jsonify(result)
+    else:
+        return jsonify({'error': 'Data not found'}), 404
 
+@app.route('/support-resistance')
+def get_support_resistance():
+    symbol = request.args.get('symbol', 'NSE:NIFTY50-INDEX')
+    interval = request.args.get('interval', '5')
 
+    data = fetch_data_from_db(symbol, interval)
 
-
+    df = pd.DataFrame(data, columns=['Date','Open','High','Low','Close'])
+    df.columns = ['date', 'open', 'high', 'low', 'close']
+    df['date'] = pd.to_datetime(df['date'])
+    df = df.iloc[-1000:] 
+    
+    prd = 30  
+    nsr = 5
+    
+    sup = df[df.low == df.low.rolling(prd, center=True).min()].low
+    res = df[df.high == df.high.rolling(prd, center=True).max()].high
+    lev = sup.tolist() + res.tolist()
+    lev.sort()
+    
+    kmeans = KMeans(n_clusters=int(nsr), random_state=42).fit(
+        np.array(lev).reshape(-1, 1))
+    lset = []
+    for cluster_center in kmeans.cluster_centers_:
+        closest_index = np.argmin(np.abs(lev - cluster_center))
+        lset.append(lev[closest_index])
+    return jsonify(lset)
 # This line retrieves the WSGI application instance
 application = app.wsgi_app
 

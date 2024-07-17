@@ -7,10 +7,33 @@ const chartProperties = {
   }
 };
 const domElement = document.getElementById('tvchart');
-const chart = LightweightCharts.createChart(domElement, chartProperties);
+const chart = LightweightCharts.createChart(domElement, {
+  width: domElement.clientWidth,
+  height: domElement.clientHeight,
+  ...chartProperties
+});
 const candleSeries = chart.addCandlestickSeries();
 const hoverInfo = document.getElementById('hover-info');
 const spinner = document.getElementById('spinner');
+
+// Function to resize the chart
+function resizeChart() {
+  chart.resize(domElement.clientWidth, domElement.clientHeight);
+}
+
+// Resize the chart initially
+resizeChart();
+
+// Use ResizeObserver to detect size changes
+const resizeObserver = new ResizeObserver(() => {
+  resizeChart();
+});
+
+// Start observing the container
+resizeObserver.observe(domElement);
+
+// Optionally: Handle window resize event as a fallback
+window.addEventListener('resize', resizeChart);
 
 // Helper function to parse date-time string to Unix timestamp in seconds
 function parseDateTimeToUnix(dateTime) {
@@ -23,12 +46,10 @@ function parseDateTimeToUnix(dateTime) {
   return Math.floor(newDate.getTime() / 1000);
 }
 
-// Show the spinner
 function showSpinner() {
   spinner.style.display = 'block';
 }
 
-// Hide the spinner
 function hideSpinner() {
   spinner.style.display = 'none';
 }
@@ -46,7 +67,6 @@ async function fetchData(symbol, interval) {
       low: parseFloat(d.Low),
       close: parseFloat(d.Close)
     }));
-    // console.log('Fetched and parsed data:', cdata);
     candleSeries.setData(cdata);
     hideSpinner();
   } catch (error) {
@@ -55,69 +75,68 @@ async function fetchData(symbol, interval) {
   }
 }
 
-// Handle crosshair move event to display hover info
-chart.subscribeCrosshairMove(param => {
-  if (!param || !param.time) {
-    hideHoverInfo();
-    return;
-  }
-  const { seriesData } = param;
-  const data = seriesData.get(candleSeries);
-  if (data) {
-    const hoverInfoContent = `
-      <div>Time: ${(new Date(param.time * 1000 - ((5 * 60 * 60 * 1000) + (30 * 60 * 1000)))).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</div>
-      <div>Open: ${data.open}</div>
-      <div>High: ${data.high}</div>
-      <div>Low: ${data.low}</div>
-      <div>Close: ${data.close}</div>
-    `;
-    showHoverInfo(param.point.x, param.point.y, hoverInfoContent);
-  } else {
-    hideHoverInfo();
-  }
-});
-
-// Function to show hover info box
-function showHoverInfo(x, y, content) {
-  hoverInfo.style.display = 'block';
-  hoverInfo.style.top = `${y + 20}px`;
-  hoverInfo.style.left = `${x + 20}px`;
-  hoverInfo.innerHTML = content;
-}
-
-// Function to hide hover info box
-function hideHoverInfo() {
-  hoverInfo.style.display = 'none';
+// Function to update table cells
+function updateTable(symbol, last, chg, chgPct) {
+  const table = document.getElementById('stock-table');
+  const rows = table.querySelectorAll('.stock-row');
+  
+  rows.forEach(row => {
+    if (row.getAttribute('data-symbol') === symbol) {
+      row.querySelector('td:nth-child(2)').textContent = last;
+      row.querySelector('td:nth-child(3)').textContent = chg >= 0 ? `+${chg}` : chg;
+      row.querySelector('td:nth-child(4)').textContent = `${chgPct}%`;
+    }
+  });
 }
 
 function selectStock(row) {
-  // Get all rows with the class 'stock-row'
   var rows = document.getElementsByClassName('stock-row');
   
-  // Remove the 'selected' class from all rows
   for (var i = 0; i < rows.length; i++) {
       rows[i].classList.remove('selected');
   }
   
-  // Add the 'selected' class to the clicked row
   row.classList.add('selected');
-
-  // Get the stock name from the first cell of the selected row
   var stockName = row.getElementsByTagName('td')[0].innerText;
-  
-  // Update the text content of the span with id 'selected-stock'
   document.getElementById('selected-stock').textContent = stockName;
-
-  // Get the interval from the select element
   const interval = document.getElementById('interval-select').value;
-  
-  // Get the stock symbol from the data attribute of the selected row
   const symbol = row.getAttribute('data-symbol');
-  
-  // Fetch data for the selected stock and interval
   fetchData(symbol, interval);
+  if (selectedOptions.includes('sup-res')) {
+    fetchAndDrawSupportResistance(symbol, interval);
+  }
 }
 
+let priceLines = [];
+
+async function fetchAndDrawSupportResistance(symbol, interval) {
+  showSpinner();
+  try {
+    const response = await fetch(`/support-resistance?symbol=${symbol}&interval=${interval}`);
+    const levels = await response.json();
+    priceLines.forEach(line => {
+      candleSeries.removePriceLine(line);
+    });
+    priceLines = [];
+  
+    // Add new price lines
+    levels.forEach(level => {
+      const line = candleSeries.createPriceLine({
+        price: level,
+        color: 'black',
+        lineWidth: 2,
+        lineStyle: LightweightCharts.LineStyle.Solid,
+        axisLabelVisible: true,
+        title: 'S&R'
+      });
+      priceLines.push(line);
+    });
+    hideSpinner();
+  } catch (error) {
+    console.error(error);
+    hideSpinner();
+  }
+}
 // Update the change event listener for the interval select
 document.getElementById('interval-select').addEventListener('change', (event) => {
   const interval = event.target.value;
@@ -128,13 +147,25 @@ document.getElementById('interval-select').addEventListener('change', (event) =>
   if (selectedRow) {
     const symbol = selectedRow.getAttribute('data-symbol');
     fetchData(symbol, interval);
+    if (selectedOptions.includes('sup-res')) {
+      fetchAndDrawSupportResistance(symbol, interval);
+    }
   }
 });
 
+// Search Button
 document.addEventListener('DOMContentLoaded', () => {
   const searchButton = document.getElementById('search-button');
   const searchPopup = document.getElementById('search-popup');
   const closeButton = document.querySelector('.close-button');
+
+  // Get all stock rows and fetch data for each stock
+  const rows = document.querySelectorAll('.stock-row');
+  rows.forEach(row => {
+    const symbol = row.getAttribute('data-symbol');
+    const interval = document.getElementById('interval-select').value;
+    fetchChange(symbol, interval, row);
+  });
 
   // Search button click event
   searchButton.addEventListener('click', () => {
@@ -154,7 +185,28 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+// Function to fetch and process data from the new /get-change endpoint
+async function fetchChange(symbol, interval, row) {
+  showSpinner();
+  try {
+    const response = await fetch(`/get-change?symbol=${symbol}&interval=${interval}`);
+    const data = await response.json();
+    
+    if (data.error) {
+      console.error(data.error);
+    } else {
+      // Update table cells with new data
+      updateTable(symbol, data.last, data.chg.toFixed(2), data.chgPct, row);
+    }
 
+    hideSpinner();
+  } catch (error) {
+    console.error(error);
+    hideSpinner();
+  }
+}
+
+// Pattern Select Dropdown 
 document.addEventListener('DOMContentLoaded', () => {
   const dropdownHeader = document.getElementById('dropdown-header');
   const dropdownContent = document.getElementById('dropdown-content');
@@ -179,6 +231,14 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedOptions = selectedOptions.filter(item => item !== value);
       }
 
+      const selectedRow = document.querySelector('.stock-row.selected');
+      if (selectedRow) {
+        const symbol = selectedRow.getAttribute('data-symbol');
+        const interval = document.getElementById('interval-select').value;
+        if (selectedOptions.includes('sup-res')) {
+          fetchAndDrawSupportResistance(symbol, interval);
+        }
+      }
     });
   });
 
@@ -188,10 +248,10 @@ document.addEventListener('DOMContentLoaded', () => {
       dropdownContent.style.display = 'none';
     }
   });
-});
+}); 
 
+// Fullscreen button functionality
 document.addEventListener("DOMContentLoaded", function() {
-  // Fullscreen button functionality
   const fullscreenButton = document.getElementById("fullscreen-button");
 
   fullscreenButton.addEventListener("click", function() {
@@ -222,7 +282,33 @@ document.addEventListener("DOMContentLoaded", function() {
   });
 });
 
+// Add hover info mouse move event listener
+chart.subscribeCrosshairMove(function(param) {
+  if (!param || !param.time || !param.seriesData.size) {
+    hoverInfo.innerHTML = '';
+    return;
+  }
 
+  const data = param.seriesData.get(candleSeries);
+  if (!data) {
+    hoverInfo.innerHTML = '';
+    return;
+  }
+
+  let { open, close, high, low } = data;
+
+  open = open.toFixed(2);
+  close = close.toFixed(2);
+  high = high.toFixed(2);
+  low = low.toFixed(2);
+
+  hoverInfo.innerHTML = `
+    Open: ${open}
+    Close: ${close}
+    High: ${high}
+    Low: ${low}
+  `;
+});
 
 // Initialize fetch data with the default selected row and interval
 window.onload = () => {
