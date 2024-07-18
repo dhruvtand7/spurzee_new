@@ -1269,7 +1269,7 @@ def fetch_data_from_db(symbol, interval):
             FROM {sym}
             GROUP BY interval_id
             ORDER BY max_date DESC
-            LIMIT 5000  
+            LIMIT 5100  
         ) AS t
         INNER JOIN {sym} ae ON ae.`date` = t.max_date
         ORDER BY t.max_date ASC;
@@ -1311,9 +1311,11 @@ def fetch_latest_data(symbol):
     con.close()
     return rows
 
+dtime_datetime = dt.datetime.now()
+dtime = dtime_datetime.strftime("%Y-%m-%d")
+
 def fetch_currentday_data(symbol, interval):
-    dtime_datetime = dt.datetime.now()
-    dtime = dtime_datetime.strftime("%Y-%m-%d")
+    
     data = {
             "symbol": symbol,
             "resolution": interval,
@@ -1370,6 +1372,23 @@ def check_user_credentials(email, password):
     conn.close()
     return user
 
+def compare_db_current_date(symbol):
+    con = mysql.connector.connect(**db_config3)
+    cur = con.cursor()
+    sym = symbol
+    parts = sym.split(':')[-1].replace('-', '_').replace('&', '_')
+    sym = parts.lower()
+    cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'stocks'")
+    tables = cur.fetchall()
+    tables = [table[0] for table in tables]
+    if sym not in tables :
+        return True
+    cur.execute(f"SELECT MAX(`date`) FROM {sym}")
+    ltime = cur.fetchall()
+    ltime = ltime[0][0].strftime('%y-%m-%d')
+    if dtime > ltime :
+        return True
+    return False
 
 def is_email_registered(email):
     conn = mysql.connector.connect(**db_config2)
@@ -1518,7 +1537,10 @@ def get_data():
     interval = request.args.get('interval', '5')
     # Fetch data from database
     data1 = fetch_data_from_db(symbol, interval)
-    data2 = fetch_currentday_data(symbol, interval)
+    if compare_db_current_date(symbol):
+        data2 = fetch_currentday_data(symbol, interval)
+    else:
+        data2 = []
     data = data1 + data2
     if data:
         return jsonify(data)
@@ -1545,6 +1567,19 @@ def get_change():
     else:
         return jsonify({'error': 'Data not found'}), 404
 
+def calculate_sr_lines(df, prd, nsr):
+    sup = df[df.low == df.low.rolling(prd, center=True).min()].low
+    res = df[df.high == df.high.rolling(prd, center=True).max()].high
+    lev = sup.tolist() + res.tolist()
+    lev.sort()
+    kmeans = KMeans(n_clusters=int(nsr), random_state=42).fit(
+        np.array(lev).reshape(-1, 1))
+    lset = []
+    for cluster_center in kmeans.cluster_centers_:
+        closest_index = np.argmin(np.abs(lev - cluster_center))
+        lset.append(lev[closest_index])
+    return lset
+
 @app.route('/support-resistance')
 def get_support_resistance():
     symbol = request.args.get('symbol', 'NSE:NIFTY50-INDEX')
@@ -1552,27 +1587,26 @@ def get_support_resistance():
 
     data = fetch_data_from_db(symbol, interval)
 
-    df = pd.DataFrame(data, columns=['Date','Open','High','Low','Close'])
+    df = pd.DataFrame(data, columns=['Date', 'Open', 'High', 'Low', 'Close'])
     df.columns = ['date', 'open', 'high', 'low', 'close']
     df['date'] = pd.to_datetime(df['date'])
-    df = df.iloc[-1000:] 
     
     prd = 30  
-    nsr = 5
+    nsr = 8
+    groups = 3
+    group_size = 1700
     
-    sup = df[df.low == df.low.rolling(prd, center=True).min()].low
-    res = df[df.high == df.high.rolling(prd, center=True).max()].high
-    lev = sup.tolist() + res.tolist()
-    lev.sort()
+    sr_lines_groups = []
+    for i in range(groups):
+        group_df = df.iloc[i*group_size:(i+1)*group_size]
+        sr_lines = calculate_sr_lines(group_df, prd, nsr)
+        sr_lines_groups.append({
+            "start_date": group_df['date'].iloc[0].strftime('%Y-%m-%d %H:%M:%S'),
+            "end_date": group_df['date'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S'),
+            "sr_lines": sr_lines
+        })
     
-    kmeans = KMeans(n_clusters=int(nsr), random_state=42).fit(
-        np.array(lev).reshape(-1, 1))
-    lset = []
-    for cluster_center in kmeans.cluster_centers_:
-        closest_index = np.argmin(np.abs(lev - cluster_center))
-        lset.append(lev[closest_index])
-    return jsonify(lset)
-# This line retrieves the WSGI application instance
+    return jsonify(sr_lines_groups)# This line retrieves the WSGI application instance
 application = app.wsgi_app
 
 if __name__ == '__main__':

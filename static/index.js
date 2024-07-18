@@ -107,29 +107,39 @@ function selectStock(row) {
   }
 }
 
-let priceLines = [];
+let srLineSeries = [];
 
+// Function to fetch and draw support and resistance lines
 async function fetchAndDrawSupportResistance(symbol, interval) {
   showSpinner();
   try {
     const response = await fetch(`/support-resistance?symbol=${symbol}&interval=${interval}`);
-    const levels = await response.json();
-    priceLines.forEach(line => {
-      candleSeries.removePriceLine(line);
-    });
-    priceLines = [];
-  
-    // Add new price lines
-    levels.forEach(level => {
-      const line = candleSeries.createPriceLine({
-        price: level,
-        color: 'black',
-        lineWidth: 2,
-        lineStyle: LightweightCharts.LineStyle.Solid,
-        axisLabelVisible: true,
-        title: 'S&R'
+    const srGroups = await response.json();
+    
+    // Clear existing SR line series
+    srLineSeries.forEach(series => chart.removeSeries(series));
+    srLineSeries = [];
+    
+    srGroups.forEach((group, index) => {
+      const color = ['black', 'blue', 'green'][index];
+      const { start_date, end_date, sr_lines } = group;
+      const startTime = parseDateTimeToUnix(start_date);
+      const endTime = parseDateTimeToUnix(end_date);
+      
+      sr_lines.forEach(level => {
+        const horizontalLineData = [
+          { time: startTime, value: level },
+          { time: endTime, value: level }
+        ];
+        
+        const lineSeries = chart.addLineSeries({
+          color: color,
+          lineWidth: 1,
+        });
+        
+        lineSeries.setData(horizontalLineData);
+        srLineSeries.push(lineSeries);
       });
-      priceLines.push(line);
     });
     hideSpinner();
   } catch (error) {
@@ -137,6 +147,7 @@ async function fetchAndDrawSupportResistance(symbol, interval) {
     hideSpinner();
   }
 }
+
 // Update the change event listener for the interval select
 document.getElementById('interval-select').addEventListener('change', (event) => {
   const interval = event.target.value;
@@ -150,6 +161,7 @@ document.getElementById('interval-select').addEventListener('change', (event) =>
     if (selectedOptions.includes('sup-res')) {
       fetchAndDrawSupportResistance(symbol, interval);
     }
+
   }
 });
 
@@ -238,7 +250,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedOptions.includes('sup-res')) {
           fetchAndDrawSupportResistance(symbol, interval);
         }
+        else{
+          srLineSeries.forEach(series => chart.removeSeries(series));
+          srLineSeries = [];
+        }
       }
+      
     });
   });
 
