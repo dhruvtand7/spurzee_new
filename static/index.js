@@ -16,6 +16,7 @@ const candleSeries = chart.addCandlestickSeries();
 const hoverInfo = document.getElementById('hover-info');
 const spinner = document.getElementById('spinner');
 
+let currentOHLC = {};
 // Function to resize the chart
 function resizeChart() {
   chart.resize(domElement.clientWidth, domElement.clientHeight);
@@ -68,7 +69,9 @@ async function fetchData(symbol, interval) {
       close: parseFloat(d.Close)
     }));
     candleSeries.setData(cdata);
+    const lastCandle = cdata[cdata.length - 1];
     hideSpinner();
+    return lastCandle;
   } catch (error) {
     log(error);
     hideSpinner();
@@ -89,7 +92,7 @@ function updateTable(symbol, last, chg, chgPct) {
   });
 }
 
-function selectStock(row) {
+async function selectStock(row) {
   var rows = document.getElementsByClassName('stock-row');
   
   for (var i = 0; i < rows.length; i++) {
@@ -102,6 +105,14 @@ function selectStock(row) {
   const interval = document.getElementById('interval-select').value;
   const symbol = row.getAttribute('data-symbol');
   fetchData(symbol, interval);
+  const lastCandle = await fetchData(symbol, interval);
+  if (lastCandle) {
+    skt.unsubscribe([symbol], false, 1);
+    skt.subscribe([symbol], false, 1);
+    currentOHLC[lastCandle.time] = lastCandle;
+    console.log(currentOHLC[lastCandle.time]);
+    console.log(lastCandle);
+  }
   if (selectedOptions.includes('sup-res')) {
     fetchAndDrawSupportResistance(symbol, interval);
   }
@@ -149,7 +160,7 @@ async function fetchAndDrawSupportResistance(symbol, interval) {
 }
 
 // Update the change event listener for the interval select
-document.getElementById('interval-select').addEventListener('change', (event) => {
+document.getElementById('interval-select').addEventListener('change', async (event) => {
   const interval = event.target.value;
 
   // Find the selected stock row
@@ -158,6 +169,12 @@ document.getElementById('interval-select').addEventListener('change', (event) =>
   if (selectedRow) {
     const symbol = selectedRow.getAttribute('data-symbol');
     fetchData(symbol, interval);
+    const lastCandle = await fetchData(symbol, interval);
+    if (lastCandle) {
+      currentOHLC[lastCandle.time] = lastCandle;
+      console.log(currentOHLC[lastCandle.time]);
+      console.log(lastCandle);
+    }
     if (selectedOptions.includes('sup-res')) {
       fetchAndDrawSupportResistance(symbol, interval);
     }
@@ -217,6 +234,8 @@ async function fetchChange(symbol, interval, row) {
     hideSpinner();
   }
 }
+let selectedOptions = [];
+
 
 // Pattern Select Dropdown 
 document.addEventListener('DOMContentLoaded', () => {
@@ -224,8 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const dropdownContent = document.getElementById('dropdown-content');
   const options = document.querySelectorAll('.option');
 
-  let selectedOptions = [];
-
+ 
   // Toggle dropdown visibility on header click
   dropdownHeader.addEventListener('click', () => {
     dropdownContent.style.display = dropdownContent.style.display === 'block' ? 'none' : 'block';
@@ -336,3 +354,100 @@ window.onload = () => {
     fetchData(symbol, interval);
   }
 };
+
+const accessTocken = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJhcGkuZnllcnMuaW4iLCJpYXQiOjE3MjE0MTAxNDcsImV4cCI6MTcyMTQzNTQwNywibmJmIjoxNzIxNDEwMTQ3LCJhdWQiOlsieDowIiwieDoxIiwieDoyIiwiZDoxIiwiZDoyIiwieDoxIiwieDowIl0sInN1YiI6ImFjY2Vzc190b2tlbiIsImF0X2hhc2giOiJnQUFBQUFCbW1xSmpkdDdDOUg4T2Z1ZDQwN0czY0haMTc1dTlucFE0Y25PLTBUTEJkb2FTdV9kUkdVVU5QUkdtSXRMamF1d1ozTFZtVm5CNWpRZUd1ai1Fd2poblBsejdaSWx1RW9DWXlBa1FHVHl0ZDNQdmZVdz0iLCJkaXNwbGF5X25hbWUiOiJMT0tFU0ggVEFMTFVSSSIsIm9tcyI6IksxIiwiaHNtX2tleSI6ImI4MWI3MmZjOGNhNTQ0ZTQ4YzY1ODZhMmI5ZDY2ZTkxOWJiNTRmY2NiNjRmNzY5M2IzNDkzYzI2IiwiZnlfaWQiOiJZTDAwMTM3IiwiYXBwVHlwZSI6MTAwLCJwb2FfZmxhZyI6Ik4ifQ.-LJx5kryaqxZKXoJXZZY1zvsh1rdM1Z84tMCqdegsWg"
+
+var skt = fyersDataSocket.getInstance(accessTocken);
+
+function roundTimeToInterval(unixTimestamp, intervalMinutes) {
+  const date = new Date((unixTimestamp + 5.5 * 60 * 60) * 1000);
+  let minutes = date.getMinutes();
+  let hours = date.getHours();
+
+  if (intervalMinutes === 30) {
+      if (minutes < 15) {
+          minutes = 45;
+          hours = hours - 1; // previous hour
+      } else if (minutes < 45) {
+          minutes = 15;
+      } else {
+          minutes = 45;
+      }
+  } else if (intervalMinutes === 60) {
+      if (minutes < 15) {
+          minutes = 15;
+          hours =  hours - 1; // previous hour
+      } else {
+          minutes = 15;
+      }
+  } else {
+      minutes = Math.floor(minutes / intervalMinutes) * intervalMinutes;
+  }
+
+  date.setHours(hours);
+  date.setMinutes(minutes, 0, 0);
+  return Math.floor(date.getTime() / 1000) ;
+}
+
+
+
+
+
+// Function to update OHLC data
+function updateOHLC(ltp, time) {
+  const interval = document.getElementById('interval-select').value;
+  const roundedTime = roundTimeToInterval(time, interval);
+
+  if (!currentOHLC[roundedTime]) {
+    currentOHLC[roundedTime] = {
+      time: roundedTime,
+      open: ltp,
+      high: ltp,
+      low: ltp,
+      close: ltp,
+    };
+  } else {
+    currentOHLC[roundedTime].high = Math.max(currentOHLC[roundedTime].high, ltp);
+    currentOHLC[roundedTime].low = Math.min(currentOHLC[roundedTime].low, ltp);
+    currentOHLC[roundedTime].close = ltp;
+  }
+
+  candleSeries.update(currentOHLC[roundedTime]);
+}
+
+// WebSocket message handler
+function onmsg(message) {
+  const parsedData = message;
+  // console.log(message);
+  const selectedRow = document.querySelector('.stock-row.selected');
+  const symbol = selectedRow.getAttribute('data-symbol');
+  if (parsedData.symbol === symbol) {
+    const time = parsedData.exch_feed_time;
+    const ltp = parsedData.ltp;
+    updateOHLC(ltp, time);
+  }
+}
+
+
+skt.on("connect", function() {
+    const selectedRow = document.querySelector('.stock-row.selected');
+    const symbol = selectedRow.getAttribute('data-symbol');
+    skt.subscribe([symbol], false, 1);
+    skt.mode(skt.FullMode, 1);
+    console.log(skt.isConnected());
+    skt.autoreconnect();
+});
+
+skt.on("message", function(message) {
+    onmsg(message);
+});
+
+skt.on("error", function(message) {
+    console.log("error is", message);
+});
+
+skt.on("close", function() {
+    console.log("socket closed");
+});
+
+skt.connect();

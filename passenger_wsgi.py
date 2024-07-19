@@ -1254,7 +1254,13 @@ def fetch_data_from_db(symbol, interval):
     sym = symbol
     parts = sym.split(':')[-1].replace('-', '_').replace('&', '_')
     sym = parts.lower()
-    print('bf')
+    
+    cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'stocks'")
+    tables = cur.fetchall()
+    tables = [table[0] for table in tables]
+    if sym not in tables or interval == '1' or interval == '3':
+        return []
+    # Example SQL query (adjust as per your schema)
     query = f"""
         SELECT t.INTERVAL_START AS `Interval`, t.`Open`, t.`High`, t.`Low`, ae.`Close`, t.`Volume`
         FROM (
@@ -1269,14 +1275,13 @@ def fetch_data_from_db(symbol, interval):
             FROM {sym}
             GROUP BY interval_id
             ORDER BY max_date DESC
-            LIMIT 5100  
+            LIMIT 5000  
         ) AS t
         INNER JOIN {sym} ae ON ae.`date` = t.max_date
         ORDER BY t.max_date ASC;
             """
     cur.execute(query)
     rows = cur.fetchall()
-    print('aft')
     seen = set()
     data = []
     for row in rows:
@@ -1287,14 +1292,13 @@ def fetch_data_from_db(symbol, interval):
             'Low': row[3],
             'Close': row[4]
         }
-        if row_data['Date'] not in seen:
-            seen.add(row_data['Date'])
+        row_tuple = tuple(row_data.items())  # Convert dict to tuple for hashable set
+        if row_tuple not in seen:
+            seen.add(row_tuple)
             data.append(row_data)
 
     con.close()
-    
     return data
-
 
 def fetch_latest_data(symbol):
     con = mysql.connector.connect(**db_config3)
@@ -1318,7 +1322,7 @@ def fetch_currentday_data(symbol, interval):
     
     data = {
             "symbol": symbol,
-            "resolution": interval,
+            "resolution": '5S',
             "date_format": "1",
             "range_from": dtime,
             "range_to": dtime,
@@ -1335,8 +1339,16 @@ def fetch_currentday_data(symbol, interval):
     df_sorted = df.sort_values(by=['date'], ascending=True)
     df = df_sorted.drop_duplicates(subset='date', keep='first')
     df.reset_index(drop=True, inplace=True)
-    df['date'] = df['date'].dt.strftime('%Y-%m-%d %H:%M:%S')
-    data2 = df.rename(columns={
+    df['group'] = (df.index // (int(interval)*12))
+    df2 = df.groupby('group').agg({
+        'date': 'first',
+        'open': 'first',
+        'high': 'max',
+        'low': 'min',
+        'close': 'last'
+    }).reset_index(drop=True)
+    df2['date'] = df2['date'].dt.strftime('%Y-%m-%d %H:%M:%S')
+    data2 = df2.rename(columns={
         'date': 'Date',
         'open': 'Open',
         'high': 'High',
@@ -1385,7 +1397,7 @@ def compare_db_current_date(symbol):
         return True
     cur.execute(f"SELECT MAX(`date`) FROM {sym}")
     ltime = cur.fetchall()
-    ltime = ltime[0][0].strftime('%y-%m-%d')
+    ltime = ltime[0][0].strftime('%Y-%m-%d')
     if dtime > ltime :
         return True
     return False
@@ -1592,9 +1604,9 @@ def get_support_resistance():
     df['date'] = pd.to_datetime(df['date'])
     
     prd = 30  
-    nsr = 8
-    groups = 3
-    group_size = 1700
+    nsr = 13
+    groups = 1
+    group_size = 5100
     
     sr_lines_groups = []
     for i in range(groups):

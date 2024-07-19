@@ -4,9 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Stock Chart</title>
-    <script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/date-fns-tz@3.1.3/dist/cjs/index.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://cdn.fyers.in/js/sdk/1.2.0/fyers-web-sdk-v3/index.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <script src="{{ url_for('static', filename='index.js') }}" defer></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
@@ -98,6 +96,12 @@
                 <td></td>
                 <td></td>
             </tr>
+            <tr class="stock-row" data-symbol="MCX:SILVER24SEPFUT" onclick="selectStock(this)">
+              <td>Silver Sep Fut<td>
+              <td></td>
+              <td></td>
+              <td></td>
+          </tr>
             <tr class="stock-row" data-symbol="NSE:ASIANPAINT-EQ" onclick="selectStock(this)">
                 <td>Asian Paints</td>
                 <td></td>
