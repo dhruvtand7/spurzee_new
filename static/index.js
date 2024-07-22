@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
   rows.forEach(row => {
     const symbol = row.getAttribute('data-symbol');
     const interval = document.getElementById('interval-select').value;
-    fetchChange(symbol, interval, row);
+    //fetchChange(symbol, interval, row);
   });
 
   // Search button click event
@@ -215,25 +215,25 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Function to fetch and process data from the new /get-change endpoint
-async function fetchChange(symbol, interval, row) {
-  showSpinner();
-  try {
-    const response = await fetch(`/get-change?symbol=${symbol}&interval=${interval}`);
-    const data = await response.json();
+// async function fetchChange(symbol, interval, row) {
+//   showSpinner();
+//   try {
+//     const response = await fetch(`/get-change?symbol=${symbol}&interval=${interval}`);
+//     const data = await response.json();
     
-    if (data.error) {
-      console.error(data.error);
-    } else {
-      // Update table cells with new data
-      updateTable(symbol, data.last, data.chg.toFixed(2), data.chgPct, row);
-    }
+//     if (data.error) {
+//       console.error(data.error);
+//     } else {
+//       // Update table cells with new data
+//       updateTable(symbol, data.last, data.chg.toFixed(2), data.chgPct, row);
+//     }
 
-    hideSpinner();
-  } catch (error) {
-    console.error(error);
-    hideSpinner();
-  }
-}
+//     hideSpinner();
+//   } catch (error) {
+//     console.error(error);
+//     hideSpinner();
+//   }
+// }
 let selectedOptions = [];
 
 
