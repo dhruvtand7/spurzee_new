@@ -1616,25 +1616,6 @@ def get_data():
     else:
         return jsonify({'error': 'Data not found'}), 404
     
-@app.route('/get-change', methods=['GET'])
-def get_change():
-    symbol = request.args.get('symbol', 'NSE:NIFTY50-INDEX')
-    data = fetch_latest_data(symbol)
-    
-    if len(data) >= 1:
-        last_close = data[0][1]
-        prev_close = data[1][1] if len(data) > 1 else last_close
-        change = last_close - prev_close
-        change_pct = (change / prev_close) * 100 if prev_close != 0 else 0
-        
-        result = {
-            'last': last_close,
-            'chg': change,
-            'chgPct': round(change_pct, 2)
-        }
-        return jsonify(result)
-    else:
-        return jsonify({'error': 'Data not found'}), 404
 
 def calculate_sr_lines(df, prd, nsr):
     sup = df[df.low == df.low.rolling(prd, center=True).min()].low
