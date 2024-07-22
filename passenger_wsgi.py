@@ -42,7 +42,7 @@ from plotly.subplots import make_subplots
 from sklearn.cluster import KMeans
 import pandas_ta as ta
 import plotly.io as pio
-from sklearn.cluster import DBSCAN
+from sklearn.linear_model import LinearRegression
 import json
 from fyers_apiv3 import fyersModel
 import os
