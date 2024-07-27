@@ -706,9 +706,29 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
             )
     if dtop == 'true':
         def calculate_slope_angle(x, y):
-            model = LinearRegression().fit(x, y)
+            # Fit a linear regression model
+            model = LinearRegression().fit(x.reshape(-1, 1), y)
+            
+            # Get the slope from the linear regression model
             slope = model.coef_[0]
-            angle_deg = math.degrees(math.atan(slope))
+            
+            # Calculate the difference in high and low for scaling
+            diff = max(df['high']) - min(df['low'])
+            
+            # Calculate the scaled dy and dx
+            dx = max(x) - min(x)
+            dy = slope * dx * (len(df) / diff)
+            
+            # Calculate the angle using arctangent
+            angle_rad = math.atan2(dy, dx)
+            
+            # Convert radians to degrees
+            angle_deg = math.degrees(angle_rad)
+            #angle_deg = abs(angle_deg)
+            
+            if angle_deg > 90:
+                angle_deg = 180-angle_deg
+                
             return slope, angle_deg
         srcands=10
         sup = df[df.low == df.low.rolling(srcands, center=True).min()].low
@@ -743,7 +763,7 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
                 end_index = pat[0]
 
                 # Check if the overall trend is upwards
-                if df['low'].iloc[start_index:end_index].iloc[-1] > df['low'].iloc[start_index:end_index].iloc[0]:
+                if 'true':
                     # Linear regression between first top and middle bottom
                     y1 = df['low'].loc[pat[0]:pat[1]].values
                     x1 = np.arange(len(y1)).reshape(-1, 1)
@@ -754,7 +774,7 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
                     x2 = np.arange(len(y2)).reshape(-1, 1)
                     slope2, angle2 = calculate_slope_angle(x2, y2)
 
-                    if angle1 < -60 and angle2 > 60:
+                    if angle1 < -65 and angle2 > 65:
                         fig.add_shape(type='line', x0=df['date'][pat[0]], y0=res.iloc[j - 2],
                                     x1=df['date'][pat[2]], y1=res.iloc[j - 1])
                         print(pat, "test", angle1, angle2)
@@ -819,9 +839,29 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
         #         pat.pop(0)
     if dbottom == 'true':
         def calculate_slope_angle(x, y):
-            model = LinearRegression().fit(x, y)
+            # Fit a linear regression model
+            model = LinearRegression().fit(x.reshape(-1, 1), y)
+            
+            # Get the slope from the linear regression model
             slope = model.coef_[0]
-            angle_deg = math.degrees(math.atan(slope))
+            
+            # Calculate the difference in high and low for scaling
+            diff = max(df['high']) - min(df['low'])
+            
+            # Calculate the scaled dy and dx
+            dx = max(x) - min(x)
+            dy = slope * dx * (len(df) / diff)
+            
+            # Calculate the angle using arctangent
+            angle_rad = math.atan2(dy, dx)
+            
+            # Convert radians to degrees
+            angle_deg = math.degrees(angle_rad)
+            #angle_deg = abs(angle_deg)
+            
+            if angle_deg > 90:
+                angle_deg = 180-angle_deg
+                
             return slope, angle_deg
 
         srcands = 10
@@ -831,7 +871,7 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
         price_diff = np.mean(df['high'] - df['low']) / 2
         pat = []
         max_bar_diff = 50
-        min_bar_diff = 3
+        min_bar_diff = 0
         i = 1
         j = 0
         flag = 1
@@ -857,7 +897,7 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
                 end_index = pat[0]
 
                 # Check if the overall trend is downwards
-                if df['high'].iloc[start_index:end_index].iloc[-1] < df['high'].iloc[start_index:end_index].iloc[0]:
+                if 'true':
                     # Linear regression between first bottom and middle top
                     y1 = df['high'].loc[pat[0]:pat[1]].values
                     x1 = np.arange(len(y1)).reshape(-1, 1)
@@ -868,7 +908,7 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
                     x2 = np.arange(len(y2)).reshape(-1, 1)
                     slope2, angle2 = calculate_slope_angle(x2, y2)
 
-                    if angle1 > 60 and angle2 < -60:
+                    if angle1 > 65 and angle2 < -65:
                         fig.add_shape(type='line', x0=df['date'][pat[0]], y0=sup.iloc[i - 2],
                                     x1=df['date'][pat[2]], y1=sup.iloc[i - 1])
                         print(pat, "test", angle1, angle2)
@@ -880,9 +920,29 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
         
     if ttop == 'true':
         def calculate_slope_angle(x, y):
-            model = LinearRegression().fit(x, y)
+            # Fit a linear regression model
+            model = LinearRegression().fit(x.reshape(-1, 1), y)
+            
+            # Get the slope from the linear regression model
             slope = model.coef_[0]
-            angle_deg = math.degrees(math.atan(slope))
+            
+            # Calculate the difference in high and low for scaling
+            diff = max(df['high']) - min(df['low'])
+            
+            # Calculate the scaled dy and dx
+            dx = max(x) - min(x)
+            dy = slope * dx * (len(df) / diff)
+            
+            # Calculate the angle using arctangent
+            angle_rad = math.atan2(dy, dx)
+            
+            # Convert radians to degrees
+            angle_deg = math.degrees(angle_rad)
+            #angle_deg = abs(angle_deg)
+            
+            if angle_deg > 90:
+                angle_deg = 180-angle_deg
+                
             return slope, angle_deg
         srcands = 10
         sup = df[df.low == df.low.rolling(srcands, center=True).min()].low
@@ -890,7 +950,7 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
         price_diff = np.mean(df['high'] - df['low']) / 2
         pat = []
         max_bar_diff = 50
-        min_bar_diff = 3
+        min_bar_diff = 0
         i = 1
         j = 0
         flag = 1
@@ -913,7 +973,7 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
             if len(pat) == 4 and pat[3] - pat[0] <= max_bar_diff and pat[3] - pat[2] >= min_bar_diff and pat[2] - pat[1] >= min_bar_diff and pat[1] - pat[0] >= min_bar_diff and abs(res.iloc[j - 2] - res.iloc[j - 1]) <= price_diff:
                 start_index = max(0, pat[0] - 20)
                 end_index = pat[0]
-                if df['low'].iloc[start_index:end_index].iloc[-1] > df['low'].iloc[start_index:end_index].iloc[0]:
+                if 'true':
                     y1 = df['low'].loc[pat[0]:pat[1]].values
                     x1 = np.arange(len(y1)).reshape(-1, 1)
                     slope1, angle1 = calculate_slope_angle(x1, y1)
@@ -923,7 +983,7 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
                     y3 = df['high'].loc[pat[2]:pat[3]].values
                     x3 = np.arange(len(y3)).reshape(-1, 1)
                     slope3, angle3 = calculate_slope_angle(x3, y3)
-                    if angle1 < -60 and angle2 > 60 and angle3 > 60:
+                    if angle1 < -65 and angle2 > 65 and angle3 > 65:
                         fig.add_shape(type='line', x0=df['date'][pat[0]], y0=res.iloc[j - 2],
                                     x1=df['date'][pat[3]], y1=res.iloc[j - 1])
                         print(pat, "test", angle1, angle2, angle3)
@@ -935,9 +995,29 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
     if tbottom == 'true':
 
         def calculate_slope_angle(x, y):
-            model = LinearRegression().fit(x, y)
+            # Fit a linear regression model
+            model = LinearRegression().fit(x.reshape(-1, 1), y)
+            
+            # Get the slope from the linear regression model
             slope = model.coef_[0]
-            angle_deg = math.degrees(math.atan(slope))
+            
+            # Calculate the difference in high and low for scaling
+            diff = max(df['high']) - min(df['low'])
+            
+            # Calculate the scaled dy and dx
+            dx = max(x) - min(x)
+            dy = slope * dx * (len(df) / diff)
+            
+            # Calculate the angle using arctangent
+            angle_rad = math.atan2(dy, dx)
+            
+            # Convert radians to degrees
+            angle_deg = math.degrees(angle_rad)
+            #angle_deg = abs(angle_deg)
+            
+            if angle_deg > 90:
+                angle_deg = 180-angle_deg
+                
             return slope, angle_deg
         srcands = 10
         sup = df[df.low == df.low.rolling(srcands, center=True).min()].low
@@ -945,7 +1025,7 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
         price_diff = np.mean(df['high'] - df['low']) / 2
         pat = []
         max_bar_diff = 50
-        min_bar_diff = 3
+        min_bar_diff = 0
         i = 1
         j = 0
         flag = 1
@@ -968,7 +1048,7 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
             if len(pat) == 4 and pat[3] - pat[0] <= max_bar_diff and pat[3] - pat[2] >= min_bar_diff and pat[2] - pat[1] >= min_bar_diff and pat[1] - pat[0] >= min_bar_diff and abs(sup.iloc[i - 2] - sup.iloc[i - 1]) <= price_diff:
                 start_index = max(0, pat[0] - 20)
                 end_index = pat[0]
-                if df['high'].iloc[start_index:end_index].iloc[-1] < df['high'].iloc[start_index:end_index].iloc[0]:
+                if 'true':
                     y1 = df['high'].loc[pat[0]:pat[1]].values
                     x1 = np.arange(len(y1)).reshape(-1, 1)
                     slope1, angle1 = calculate_slope_angle(x1, y1)
@@ -978,7 +1058,7 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
                     y3 = df['low'].loc[pat[2]:pat[3]].values
                     x3 = np.arange(len(y3)).reshape(-1, 1)
                     slope3, angle3 = calculate_slope_angle(x3, y3)
-                    if angle1 > 60 and angle2 < -60 and angle3 < -60:
+                    if angle1 > 65 and angle2 < -65 and angle3 < -65:
                         fig.add_shape(type='line', x0=df['date'][pat[0]], y0=sup.iloc[i - 2],
                                     x1=df['date'][pat[3]], y1=sup.iloc[i - 1])
                         print(pat, "test", angle1, angle2, angle3)
@@ -1408,7 +1488,7 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
                 candle_lengths_after = df['high'].iloc[mid_idx:right_idx + 1] - df['low'].iloc[mid_idx:right_idx + 1]
 
                 # Filter by angles and candle lengths
-                if angle1 < -85 and angle2 > 85 and candle_lengths_before.mean() > 80 and candle_lengths_after.mean() > 80 and (candle_lengths_before.mean() > 110 or candle_lengths_after.mean() > 110):
+                if angle1 < -70 and angle2 > 70 and candle_lengths_before.mean() > price_diff and candle_lengths_after.mean() > price_diff:
                     filtered_v_shapes.append((left_idx, mid_idx, right_idx, v_type))
                     print(angle1, angle2, candle_lengths_before.mean(), candle_lengths_after.mean())
 
@@ -1428,7 +1508,7 @@ def generate_graph(symbol, start_date, end_date, interval, ema_visible,emaval, s
                 candle_lengths_after = df['high'].iloc[mid_idx:right_idx + 1] - df['low'].iloc[mid_idx:right_idx + 1]
 
                 # Filter by angles and candle lengths
-                if angle1 > 85 and angle2 < -85 and candle_lengths_before.mean() > 80 and candle_lengths_after.mean() > 80 and (candle_lengths_before.mean() > 110 or candle_lengths_after.mean() > 110):
+                if angle1 > 70 and angle2 < -70 and candle_lengths_before.mean() > price_diff and candle_lengths_after.mean() > price_diff::
                     filtered_v_shapes.append((left_idx, mid_idx, right_idx, v_type))
                     print(angle1, angle2, candle_lengths_before.mean(), candle_lengths_after.mean())
 
